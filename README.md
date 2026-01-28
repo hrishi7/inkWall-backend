@@ -1,6 +1,6 @@
-# WallCraft Backend
+# InkWall Backend
 
-Node.js API server for the WallCraft wallpaper app.
+Node.js API server for the InkWall wallpaper app.
 
 ## Quick Start
 
