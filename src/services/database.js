@@ -43,6 +43,25 @@ export async function getCategories() {
  * @param {string} options.sort - Sort by: 'popular', 'newest', 'random'
  */
 export async function getWallpapers({ page = 1, limit = 20, category = null, sort = 'popular' }) {
+  // If sort is random, use aggregation pipeline
+  if (sort === 'random') {
+    const pipeline = [];
+    
+    // Match stage
+    if (category) {
+      pipeline.push({ $match: { category } });
+    }
+    
+    // Sample stage (Random selection)
+    // Note: $sample can be slow on very large collections (millions), but fine here
+    // For pagination effectively with random, we'd need a seed, but basic $sample 
+    // works for "refresh to get new random"
+    pipeline.push({ $sample: { size: limit } });
+    
+    return Wallpaper.aggregate(pipeline);
+  }
+
+  // Standard query for non-random sorts
   const query = {};
   
   if (category) {
@@ -51,23 +70,15 @@ export async function getWallpapers({ page = 1, limit = 20, category = null, sor
   
   let sortOption = {};
   
-  // Sorting
   switch (sort) {
     case 'newest':
       sortOption = { created_at: -1 };
-      break;
-    case 'random':
-      // Random in Mongo is harder, for simplicity in free tier we might just sort by created_at or skip random
-      // Or use aggregation $sample if the dataset is small enough, but let's stick to simple sort for now
-      // A common cheat is to sort by a random field, but let's just use default for now or fix later
-      sortOption = { created_at: -1 }; 
       break;
     case 'popular':
     default:
       sortOption = { downloads: -1, created_at: -1 };
   }
   
-  // Using skip is not performant for large offsets but fine for this scale
   const skip = (page - 1) * limit;
   
   return Wallpaper.find(query)
