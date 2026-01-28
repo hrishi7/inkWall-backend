@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
-import { initializeDatabase } from './services/database.js';
+import { initializeDatabase, getWallpaperCount } from './services/database.js';
 import wallpapersRouter from './routes/wallpapers.js';
 import categoriesRouter from './routes/categories.js';
 import { fetchAllCategoryWallpapers, seedDatabase } from './jobs/fetchWallpapers.js';
@@ -79,6 +79,7 @@ mongoose.connect(MONGODB_URI)
   .then(() => {
     console.log('📦 Connected to MongoDB');
     initializeDatabase();
+    checkAndSeed();
   })
   .catch(err => {
     console.error('❌ MongoDB connection error:', err);
@@ -92,6 +93,31 @@ cron.schedule('0 */2 * * *', async () => {
   console.log('\n⏰ Scheduled wallpaper fetch starting...');
   await fetchAllCategoryWallpapers();
 });
+
+// Manual seed endpoint (useful for initial setup)
+app.post('/api/admin/seed', async (req, res) => {
+  try {
+    console.log('🌱 Manual seed triggered');
+    seedDatabase(); // Run in background
+    res.json({ success: true, message: 'Seeding started in background' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Check if we need to seed on startup
+async function checkAndSeed() {
+  try {
+    const count = await getWallpaperCount();
+    console.log(`📊 Current wallpaper count: ${count}`);
+    if (count === 0) {
+      console.log('📭 Database is empty, starting initial seed...');
+      await seedDatabase();
+    }
+  } catch (error) {
+    console.error('❌ Error checking/seeding DB:', error);
+  }
+}
 
 // Start server
 app.listen(PORT, async () => {
